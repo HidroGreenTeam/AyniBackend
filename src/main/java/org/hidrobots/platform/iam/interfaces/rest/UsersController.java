@@ -10,6 +10,7 @@ import org.hidrobots.platform.iam.interfaces.rest.transform.UserResourceFromEnti
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,8 +38,8 @@ public class UsersController {
         return ResponseEntity.ok(userResources);
     }
 
-    @GetMapping(value= "/{userId}")
-    public ResponseEntity<UserResource> getUserById(@RequestParam Long userId) {
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserResource> getUserById(@PathVariable Long userId) {
         var GetUserByIdQuery = new GetUserByIdQuery(userId);
         var user = userQueryService.handle(GetUserByIdQuery);
 
@@ -48,9 +49,5 @@ public class UsersController {
 
         var userResource = UserResourceFromEntityAssembler.toUserResourceFromEntity(user.get());
         return ResponseEntity.ok(userResource);
-        
     }
-    
-    
-
 }
