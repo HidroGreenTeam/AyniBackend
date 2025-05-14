@@ -1,0 +1,78 @@
+name: Build and Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main  # O la rama que desees monitorear
+  workflow_dispatch:  # Permite ejecutar el flujo de trabajo manualmente
+
+env:
+  AZURE_WEBAPP_NAME: ayni-backend-mono
+  AZURE_RESOURCE_GROUP: hidrogreenteam
+  AZURE_CONTAINER_REGISTRY: aynicontainer.azurecr.io
+  IMAGE_NAME: aynibackend
+  IMAGE_TAG: ${{ github.sha }}
+  # Database configuration (uses secrets for sensitive info)
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-1617193-diegorafaelcisnerostafur-0335.l.aivencloud.com:27389/aynidb?ssl-mode=REQUIRED
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Configurar Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '22'  # Ajustado según tu Dockerfile
+          distribution: 'temurin'  # Eclipse Temurin distribution
+          cache: 'maven'
+
+      - name: Compilar el proyecto con Maven
+        env:
+          SPRING_DATASOURCE_URL: ${{ env.SPRING_DATASOURCE_URL }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: mvn clean package -DskipTests
+
+      # Inicio de sesión directo a ACR con credenciales
+      - name: Iniciar sesión en Azure Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.AZURE_CONTAINER_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}  # Configurar en los secrets de GitHub
+          password: ${{ secrets.REGISTRY_PASSWORD }}  # Configurar en los secrets de GitHub
+
+      - name: Construir y etiquetar la imagen Docker
+        env:
+          SPRING_DATASOURCE_URL: ${{ env.SPRING_DATASOURCE_URL }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          # Build with build args to pass environment variables
+          docker build \
+            --build-arg SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
+            --build-arg SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
+            --build-arg SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
+            --build-arg JWT_SECRET="${JWT_SECRET}" \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Subir la imagen al ACR
+        run: |
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      # Despliegue usando el publish profile
+      - name: Desplegar en Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+

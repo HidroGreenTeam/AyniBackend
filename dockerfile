@@ -1,5 +1,20 @@
 FROM openjdk:22-jdk
+
+# Define build arguments for database configuration
+ARG SPRING_DATASOURCE_URL
+ARG SPRING_DATASOURCE_USERNAME
+ARG SPRING_DATASOURCE_PASSWORD
+ARG JWT_SECRET
+
+# Set environment variables for runtime
+ENV SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+ENV SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+ENV SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+ENV JWT_SECRET=${JWT_SECRET}
+
 VOLUME /tmp
 EXPOSE 8080
 COPY target/*.jar app.jar
-ENTRYPOINT ["java","-jar","app.jar"]
+
+# Run with environment variables
+ENTRYPOINT ["java", "-jar", "app.jar"]
