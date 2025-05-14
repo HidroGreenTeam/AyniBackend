@@ -30,3 +30,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+## DEFAULT CONFIG FOR APP APPLICATION PROPERTIES
+application.properties
